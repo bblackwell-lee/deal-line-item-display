@@ -7,7 +7,11 @@
     "crm.objects.deals.read", 
     "crm.objects.deals.write",
     "crm.schemas.deals.read",
-    "crm.schemas.deals.write"
+    "crm.schemas.deals.write",
+     "crm.objects.line_items.read",
+    "crm.objects.line_items.write",
+    "crm.schemas.line_items.read"
+
   ],
   "public": false,
   "extensions": {
@@ -21,6 +25,7 @@
   }
 
 }
+
 
 
 
