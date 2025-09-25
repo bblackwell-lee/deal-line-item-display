@@ -229,17 +229,8 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
         }
 
         try {
-            // Construct URL with query parameters
-            const baseUrl = 'http://www.form.com/formname';
-            const queryParams = new URLSearchParams({
-                lineItemId: item.id || '',
-                productId: item.productId || '',
-                productName: item.productName || '',
-                dealId: dealId || ''
-            }).toString();
-
-            const modalUrl = `${baseUrl}?${queryParams}`;
-
+            // Use the same URL generator as the direct link
+            const modalUrl = getFormUrl(item.id, item.productId);
             console.log('Opening modal with URL:', modalUrl);
 
             actions.openIframeModal(
@@ -250,8 +241,8 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                     title: `Details for ${item.productName || 'Line Item'}`,
                     flush: false
                 },
-                (result) => {
-                    console.log('Modal closed for line item:', item.id, 'Result:', result);
+                () => {
+                    console.log('Modal closed for line item:', item.id);
                     // Optionally refresh data when modal closes
                     // loadLineItems();
                 }
@@ -379,7 +370,7 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                 <TableHeader width="min">Quantity</TableHeader>
                                 <TableHeader width="min">Unit Price</TableHeader>
                                 <TableHeader width="min">Total</TableHeader>
-                                <TableHeader width="min">Action</TableHeader>
+                                <TableHeader width="auto">Actions</TableHeader>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -397,13 +388,23 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                         <TableCell>{formatCurrency(item.price)}</TableCell>
                                         <TableCell>{formatCurrency(item.amount)}</TableCell>
                                         <TableCell>
-                                            <Button
-                                                variant="primary"
-                                                size="sm"
-                                                href={getFormUrl(item.id, item.productId)}
-                                            >
-                                                Form
-                                            </Button>
+                                            <Flex direction="row" gap="small">
+                                                <Button
+                                                    variant="primary"
+                                                    size="sm"
+                                                    href={getFormUrl(item.id, item.productId)}
+                                                >
+                                                    Open
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => openItemDetailsModal(item)}
+                                                    disabled={!actions || typeof actions.openIframeModal !== 'function'}
+                                                >
+                                                    Modal
+                                                </Button>
+                                            </Flex>
                                         </TableCell>
                                     </TableRow>
                                 );
