@@ -18,6 +18,7 @@ const DealLineItems = ({ context, runServerless }) => {
   const [lineItems, setLineItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [debugInfo, setDebugInfo] = useState(null);
 
   useEffect(() => {
     const fetchLineItems = async () => {
@@ -32,21 +33,28 @@ const DealLineItems = ({ context, runServerless }) => {
         }
         
         // Call the serverless function to get deal line items
-        const response = await runServerless('get-deal-line-items', {
+        const rawResponse = await runServerless('get-deal-line-items', {
           dealId
         });
         
-        if (!response || !Array.isArray(response.data)) {
-          console.error('Unexpected response format:', response);
-          setError('Invalid data format received from server');
+        // Store debug information
+        setDebugInfo(rawResponse);
+        
+        // Safety check for response structure
+        if (!rawResponse) {
+          setError('Empty response received from server');
           setLoading(false);
           return;
         }
         
+        // Extract data safely
+        const responseData = rawResponse.data || rawResponse.response?.data || [];
+        const items = Array.isArray(responseData) ? responseData : [];
+        
         // Process items to ensure all required fields exist with proper types
-        const processedItems = response.data.map(item => ({
-          id: item?.id || Math.random().toString(),
-          productName: item?.productName || 'Unknown Product',
+        const processedItems = items.map(item => ({
+          id: String(item?.id || Math.random()),
+          productName: String(item?.productName || 'Unknown Product'),
           quantity: Number(item?.quantity || 0),
           price: Number(item?.price || 0),
         }));
@@ -55,7 +63,7 @@ const DealLineItems = ({ context, runServerless }) => {
         setLoading(false);
       } catch (err) {
         console.error('Error fetching deal line items:', err);
-        setError('Failed to load deal line items');
+        setError(`Failed to load deal line items: ${err.message}`);
         setLoading(false);
       }
     };
@@ -73,9 +81,17 @@ const DealLineItems = ({ context, runServerless }) => {
 
   if (error) {
     return (
-      <Alert title="Error" variant="error">
-        {error}
-      </Alert>
+      <Flex direction="column" gap="md">
+        <Alert title="Error" variant="error">
+          {error}
+        </Alert>
+        {debugInfo && (
+          <Flex direction="column" gap="xs">
+            <Text format={{ fontWeight: 'bold' }}>Debug Information:</Text>
+            <Text>{JSON.stringify(debugInfo, null, 2)}</Text>
+          </Flex>
+        )}
+      </Flex>
     );
   }
 
@@ -107,10 +123,8 @@ const DealLineItems = ({ context, runServerless }) => {
             <TableRow key={item.id}>
               <TableCell>{item.productName}</TableCell>
               <TableCell>{item.quantity}</TableCell>
-              <TableCell>${typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'}</TableCell>
-              <TableCell>${typeof item.quantity === 'number' && typeof item.price === 'number' 
-                ? (item.quantity * item.price).toFixed(2) 
-                : '0.00'}</TableCell>
+              <TableCell>${item.price.toFixed(2)}</TableCell>
+              <TableCell>${(item.quantity * item.price).toFixed(2)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
