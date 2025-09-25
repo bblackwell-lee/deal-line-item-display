@@ -31,9 +31,12 @@ interface LineItem {
 interface DealLineItemsProps {
     context: any;
     runServerlessFunction: any;
+    actions: {
+        openIframeModal: (config: any, callback?: () => void) => void;
+    };
 }
 
-const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFunction }) => {
+const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFunction, actions }) => {
     // Context - add safety check
     const dealId = context?.crm?.objectId;
 
@@ -84,10 +87,38 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
                 const data = actualResponse.data;
                 if (Array.isArray(data)) {
                     console.log('Setting line items:', data);
-                    // Validate each line item before setting state
-                    const validatedItems = data.filter(item =>
-                        item && typeof item === 'object' && item.id
-                    );
+                    // MORE RIGOROUS VALIDATION HERE:
+                    const validatedItems = data.filter(item => {
+                        // Basic structure validation
+                        if (!item || typeof item !== 'object' || !item.id) return false;
+                        
+                        // Ensure properties are the expected types
+                        try {
+                            // Convert properties to expected types to ensure they're valid
+                            const validItem = {
+                                id: String(item.id || ''),
+                                productId: String(item.productId || ''),
+                                productName: String(item.productName || ''),
+                                quantity: Number(item.quantity || 0),
+                                price: Number(item.price || 0),
+                                amount: Number(item.amount || 0),
+                                product: item.product ? {
+                                    id: String(item.product.id || ''),
+                                    name: String(item.product.name || ''),
+                                    price: Number(item.product.price || 0),
+                                    description: String(item.product.description || ''),
+                                    sku: String(item.product.sku || '')
+                                } : null,
+                                ticketId: String(item.ticketId || '')
+                            };
+                            
+                            // If we got here without errors, the item is valid
+                            return true;
+                        } catch (err) {
+                            console.error("Failed to validate line item:", err, item);
+                            return false;
+                        }
+                    });
                     setLineItems(validatedItems);
                 } else if (data === null || data === undefined) {
                     console.log('No line items returned');
@@ -125,7 +156,6 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
 
     // Open the iframe using HubSpot's UI Extensions SDK
     const openIframeModal = useCallback((lineItem: LineItem) => {
-        // Add this null check
         if (!lineItem) {
             console.warn('Cannot open modal: line item is null or undefined');
             setError('Cannot open form: invalid line item data');
@@ -143,16 +173,21 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
 
         try {
             console.log('Opening iframe with URL:', url);
-            hubspot.ui.openIframe({
-                uri: url,
-                size: 'LARGE',
-                title: 'Line Item Form'
-            });
+            actions.openIframeModal(
+                {
+                    uri: url,
+                    height: 600,
+                    width: 800,
+                    title: 'Line Item Form',
+                    flush: true,
+                },
+                () => console.log('Modal closed for line item:', lineItem.id)
+            );
         } catch (error) {
             console.error('Error opening iframe:', error);
             setError('Failed to open form');
         }
-    }, []);
+    }, [actions]);
 
     // Early return for missing context
     if (!context) {
@@ -244,19 +279,21 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
                         return (
                             <Table.Row key={key}>
                                 <Table.Cell>
-                                    <Text>{item.productName || 'N/A'}</Text>
+                                    <Text>{typeof item.productName === 'string' ? item.productName : 'N/A'}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    <Text>{item.productId || 'N/A'}</Text>
+                                    <Text>{typeof item.productId === 'string' ? item.productId : 'N/A'}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    <Text>{String(item.quantity || 0)}</Text>
+                                    <Text>{String(typeof item.quantity === 'number' ? item.quantity : 0)}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    <Text>${Number(item.price || 0).toFixed(2)}</Text>
+                                    <Text>${(typeof item.price === 'number' && isFinite(item.price) ? 
+                                        Number(item.price) : 0).toFixed(2)}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    <Text>${Number(item.amount || 0).toFixed(2)}</Text>
+                                    <Text>${(typeof item.amount === 'number' && isFinite(item.amount) ? 
+                                        Number(item.amount) : 0).toFixed(2)}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
                                     <Button
@@ -320,7 +357,7 @@ class ErrorBoundary extends React.Component<
 
 // HubSpot Extension Wrapper with comprehensive error handling
 const WrappedDealLineItems = (props: any) => {
-    const { context, runServerlessFunction } = props;
+    const { context, runServerlessFunction, actions } = props;
 
     // Validate props
     if (!props) {
@@ -350,10 +387,24 @@ const WrappedDealLineItems = (props: any) => {
         );
     }
 
+    // Validate actions is available
+    if (!actions || !actions.openIframeModal) {
+        console.error('Missing actions.openIframeModal in extension props');
+        return (
+            <Alert variant="error" title="Function Error">
+                <Text>Modal function not available. Please refresh the page.</Text>
+            </Alert>
+        );
+    }
+
     // Wrap the main component in error boundary
     return (
         <ErrorBoundary>
-            <DealLineItems context={context} runServerlessFunction={runServerlessFunction} />
+            <DealLineItems 
+                context={context} 
+                runServerlessFunction={runServerlessFunction} 
+                actions={actions} 
+            />
         </ErrorBoundary>
     );
 };
