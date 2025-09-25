@@ -8,6 +8,7 @@ import {
     Table,
     Text,
     Modal,
+    ModalBody,
     hubspot
 } from '@hubspot/ui-extensions';
 
@@ -29,8 +30,6 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [lineItems, setLineItems] = useState<LineItem[]>([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
 
     // Load line items on component mount
     useEffect(() => {
@@ -65,27 +64,18 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
         }
     };
 
-    // Open the modal with the selected line item
-    const openModal = (lineItem: LineItem) => {
-        setSelectedLineItem(lineItem);
-        setIsModalOpen(true);
-    };
-
-    // Close the modal
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setSelectedLineItem(null);
-    };
-
-    // Generate iframe URL with parameters
-    const getIframeUrl = () => {
-        if (!selectedLineItem) return 'http://www.myform.com';
+    // Open the iframe using HubSpot's UI Extensions SDK
+    const openIframeModal = (lineItem: LineItem) => {
+        // Generate URL with parameters
+        const baseUrl = 'http://www.myform.com';
+        const url = `${baseUrl}?lineItemId=${encodeURIComponent(lineItem.id)}&productId=${encodeURIComponent(lineItem.productId)}`;
         
-        const url = new URL('http://www.myform.com');
-        url.searchParams.append('lineItemId', selectedLineItem.id);
-        url.searchParams.append('productId', selectedLineItem.productId);
-        
-        return url.toString();
+        // Open the iframe in a modal using the proper HubSpot method
+        hubspot.ui.openIframe({
+            uri: url,
+            size: 'LARGE',
+            title: 'Line Item Form'
+        });
     };
 
     // Render loading state
@@ -136,7 +126,7 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
                                 <Button
                                     variant="primary"
                                     size="small"
-                                    onClick={() => openModal(item)}
+                                    onClick={() => openIframeModal(item)}
                                 >
                                     Open Form
                                 </Button>
@@ -145,28 +135,12 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
                     ))}
                 </Table.Body>
             </Table>
-
-            {/* Modal with iframe */}
-            <Modal 
-                title="Line Item Form"
-                isOpen={isModalOpen}
-                onClose={closeModal}
-                width="large"
-            >
-                <iframe
-                    src={getIframeUrl()}
-                    width="100%"
-                    height="500px"
-                    frameBorder="0"
-                    title="Line Item Form"
-                />
-            </Modal>
         </Flex>
     );
 };
 
 // HubSpot Extension Wrapper
-hubspot.extend(({ context, runServerlessFunction }) => {
+export default hubspot.extend(({ context, runServerlessFunction }) => {
     try {
         return <DealLineItems context={context} runServerlessFunction={runServerlessFunction} />;
     } catch (error) {
