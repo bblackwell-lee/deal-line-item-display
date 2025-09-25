@@ -200,6 +200,19 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
         }
     };
 
+    // Generate form URL with parameters
+    const getFormUrl = (lineItemId, productId) => {
+        const baseUrl = 'http://www.form.com';
+        const params = new URLSearchParams();
+        
+        if (lineItemId) params.append('lineItemId', lineItemId);
+        if (productId) params.append('productId', productId);
+        if (dealId) params.append('dealId', dealId);
+        
+        const queryString = params.toString();
+        return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+    };
+
     // Open iframe modal with line item details
     const openItemDetailsModal = (item) => {
         // Add comprehensive validation
@@ -366,7 +379,7 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                 <TableHeader width="min">Quantity</TableHeader>
                                 <TableHeader width="min">Unit Price</TableHeader>
                                 <TableHeader width="min">Total</TableHeader>
-                                <TableHeader width="auto">Dates</TableHeader>
+                                <TableHeader width="min">Action</TableHeader>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -384,9 +397,13 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                         <TableCell>{formatCurrency(item.price)}</TableCell>
                                         <TableCell>{formatCurrency(item.amount)}</TableCell>
                                         <TableCell>
-                                            {item.startDate && item.endDate ? (
-                                                `${new Date(item.startDate).toLocaleDateString()} - ${new Date(item.endDate).toLocaleDateString()}`
-                                            ) : 'N/A'}
+                                            <Button
+                                                variant="primary"
+                                                size="sm"
+                                                href={getFormUrl(item.id, item.productId)}
+                                            >
+                                                Form
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 );
