@@ -98,12 +98,8 @@ exports.main = async (context = {}, parameters = {}) => {
         'description',
         'hs_line_item_currency_code',
         'product_type',
-        'oms_automation',
-        'associated_note_id',
-        'associated_note_title',
-        'has_associated_note',
-        'ticket_id',
-        'ready_for_fulfillment'
+        'ticket_id'
+   
       ]
     });
 
@@ -155,9 +151,7 @@ exports.main = async (context = {}, parameters = {}) => {
           sku: product.sku || ''
           
         } : null,
-        associatedNoteId: item.properties.associated_note_id || '',
-        associatedNoteTitle: item.properties.associated_note_title || '',
-        hasAssociatedNote: item.properties.has_associated_note === 'Yes',
+        
         ticketId: item.properties.ticket_id || ''
       
       };
