@@ -11,7 +11,8 @@ import {
   TableBody, 
   TableCell, 
   Alert,
-  LoadingSpinner
+  LoadingSpinner,
+  Button
 } from '@hubspot/ui-extensions';
 
 const DealLineItems = ({ context, runServerless }) => {
@@ -20,54 +21,66 @@ const DealLineItems = ({ context, runServerless }) => {
   const [error, setError] = useState(null);
   const [debugInfo, setDebugInfo] = useState(null);
 
-  useEffect(() => {
-    const fetchLineItems = async () => {
-      try {
-        // Get the current deal ID from context using the proper path
-        const dealId = context?.crm?.objectId;
-        
-        if (!dealId) {
-          setError('No deal ID found. Cannot retrieve line items.');
-          setLoading(false);
-          return;
-        }
-        
-        // Call the serverless function to get deal line items
-        const rawResponse = await runServerless('get-deal-line-items', {
-          dealId
-        });
-        
-        // Store debug information
-        setDebugInfo(rawResponse);
-        
-        // Safety check for response structure
-        if (!rawResponse) {
-          setError('Empty response received from server');
-          setLoading(false);
-          return;
-        }
-        
-        // Extract data safely
-        const responseData = rawResponse.data || rawResponse.response?.data || [];
-        const items = Array.isArray(responseData) ? responseData : [];
-        
-        // Process items to ensure all required fields exist with proper types
-        const processedItems = items.map(item => ({
-          id: String(item?.id || Math.random()),
-          productName: String(item?.productName || 'Unknown Product'),
-          quantity: Number(item?.quantity || 0),
-          price: Number(item?.price || 0),
-        }));
-        
-        setLineItems(processedItems);
+  const fetchLineItems = async () => {
+    try {
+      setLoading(true);
+      // Get the current deal ID from context using the proper path
+      const dealId = context?.crm?.objectId;
+      
+      if (!dealId) {
+        setError('No deal ID found. Cannot retrieve line items.');
         setLoading(false);
-      } catch (err) {
-        console.error('Error fetching deal line items:', err);
-        setError(`Failed to load deal line items: ${err.message}`);
-        setLoading(false);
+        return;
       }
-    };
+      
+      console.log(`Fetching line items for deal: ${dealId}`);
+      
+      // Call the serverless function to get deal line items - UPDATED to match DealProductConfiguration pattern
+      const response = await runServerless({
+        name: 'get-deal-line-items', 
+        parameters: { dealId }
+      });
+      
+      // Store debug information - also update how we handle response
+      setDebugInfo(response);
+      
+      // Safety check for response structure
+      if (!response) {
+        setError('Empty response received from server');
+        setLoading(false);
+        return;
+      }
+      
+      // Extract data safely with the correct response pattern
+      let actualResponse = response;
+      if (response.status === "SUCCESS" && response.response) {
+        actualResponse = response.response;
+      }
 
+      // Access data from the correct response structure
+      const responseData = actualResponse.data || [];
+      const items = Array.isArray(responseData) ? responseData : [];
+      
+      console.log(`Retrieved ${items.length} line items`);
+      
+      // Process items to ensure all required fields exist with proper types
+      const processedItems = items.map(item => ({
+        id: String(item?.id || Math.random()),
+        productName: String(item?.productName || 'Unknown Product'),
+        quantity: Number(item?.quantity || 0),
+        price: Number(item?.price || 0),
+      }));
+      
+      setLineItems(processedItems);
+    } catch (err) {
+      console.error('Error fetching deal line items:', err);
+      setError(`Failed to load deal line items: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchLineItems();
   }, [context, runServerless]);
 
@@ -91,23 +104,28 @@ const DealLineItems = ({ context, runServerless }) => {
             <Text>{JSON.stringify(debugInfo, null, 2)}</Text>
           </Flex>
         )}
+        <Button onClick={fetchLineItems}>Retry</Button>
       </Flex>
     );
   }
 
   if (lineItems.length === 0) {
     return (
-      <Flex align="center" justify="center" padding="md">
+      <Flex align="center" justify="center" padding="md" direction="column" gap="md">
         <Text>No line items found for this deal</Text>
+        <Button onClick={fetchLineItems}>Refresh</Button>
       </Flex>
     );
   }
 
   return (
     <Flex direction="column" gap="md">
-      <Text format={{ fontSize: 'large', fontWeight: 'bold' }}>
-        Deal Line Items
-      </Text>
+      <Flex justify="space-between" align="center">
+        <Text format={{ fontSize: 'large', fontWeight: 'bold' }}>
+          Deal Line Items ({lineItems.length})
+        </Text>
+        <Button variant="secondary" onClick={fetchLineItems}>Refresh</Button>
+      </Flex>
       
       <Table>
         <TableHead>
@@ -129,6 +147,10 @@ const DealLineItems = ({ context, runServerless }) => {
           ))}
         </TableBody>
       </Table>
+      
+      <Text format={{ fontSize: 'small', color: 'gray' }}>
+        Last updated: {new Date().toLocaleString()}
+      </Text>
     </Flex>
   );
 };
