@@ -7,6 +7,8 @@ import {
     Text,
     Tile,
     Image,
+    Button,
+    Table,
     hubspot
 } from '@hubspot/ui-extensions';
 
@@ -42,7 +44,7 @@ interface DealInfo {
     isClosed: boolean;
 }
 
-const DealLineItems = ({ context, runServerlessFunction }) => {
+const DealLineItems = ({ context, runServerlessFunction, actions }) => {
     // Context
     const dealId = context.crm.objectId;
 
@@ -129,6 +131,56 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
         }
     };
 
+    // Open iframe modal with line item details
+    const openItemDetailsModal = (item) => {
+        if (!actions.openIframeModal) {
+            console.error('openIframeModal action not available');
+            return;
+        }
+
+        // Construct URL with query parameters
+        const baseUrl = 'http://www.form.com/formname';
+        const queryParams = new URLSearchParams({
+            lineItemId: item.id,
+            productId: item.productId || '',
+            productName: item.productName || '',
+            dealId: dealId
+        }).toString();
+
+        const modalUrl = `${baseUrl}?${queryParams}`;
+
+        actions.openIframeModal(
+            {
+                uri: modalUrl,
+                height: 700,
+                width: 900,
+                title: `Details for ${item.productName}`,
+                flush: false
+            },
+            () => {
+                console.log('Modal closed for line item:', item.id);
+                // Optionally refresh data when modal closes
+                // loadLineItems();
+            }
+        );
+    };
+
+    // Total calculations for footer
+    const calculateTotals = () => {
+        if (!existingLineItems || existingLineItems.length === 0) {
+            return { quantity: 0, amount: 0 };
+        }
+
+        return existingLineItems.reduce((totals, item) => {
+            return {
+                quantity: totals.quantity + (item.quantity || 0),
+                amount: totals.amount + (item.amount || 0)
+            };
+        }, { quantity: 0, amount: 0 });
+    };
+
+    const totals = calculateTotals();
+
     // Render
     return dealLoading ? (
         <Flex direction="column" align="center" justify="center" gap="small">
@@ -170,53 +222,53 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
                         <Text>Loading line items...</Text>
                     </Flex>
                 ) : existingLineItems.length > 0 ? (
-                    <Flex direction="column" gap="small">
-                        {/* Table header */}
-                        <Flex direction="row" gap="small" style={{ 
-                            padding: '8px', 
-                            borderBottom: '1px solid #e5e7eb',
-                            fontWeight: 'bold'
-                        }}>
-                            <Text style={{ width: '30%' }}>Product Name</Text>
-                            <Text style={{ width: '15%' }}>Quantity</Text>
-                            <Text style={{ width: '15%' }}>Unit Price</Text>
-                            <Text style={{ width: '15%' }}>Total</Text>
-                            <Text style={{ width: '25%' }}>Dates</Text>
-                        </Flex>
-                        
-                        {/* Table rows */}
-                        {existingLineItems.map((item, index) => (
-                            <Flex key={item.id} direction="row" gap="small" align="center" style={{ 
-                                padding: '8px', 
-                                borderBottom: '1px solid #e5e7eb',
-                                backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff'
-                            }}>
-                                <Text style={{ width: '30%' }}>{item.productName}</Text>
-                                <Text style={{ width: '15%' }}>{item.quantity}</Text>
-                                <Text style={{ width: '15%' }}>${item.price.toFixed(2)}</Text>
-                                <Text style={{ width: '15%' }}>${item.amount.toFixed(2)}</Text>
-                                <Text style={{ width: '25%' }}>
-                                    {item.startDate && item.endDate 
-                                        ? `${new Date(item.startDate).toLocaleDateString()} - ${new Date(item.endDate).toLocaleDateString()}`
-                                        : 'N/A'}
-                                </Text>
-                            </Flex>
-                        ))}
-                        
-                        {/* Total row */}
-                        <Flex direction="row" gap="small" align="center" style={{ 
-                            padding: '8px', 
-                            borderBottom: '1px solid #e5e7eb',
-                            fontWeight: 'bold',
-                            backgroundColor: '#f3f4f6'
-                        }}>
-                            <Text style={{ width: '30%' }}>Total</Text>
-                            <Text style={{ width: '15%' }}>{existingLineItems.reduce((sum, item) => sum + item.quantity, 0)}</Text>
-                            <Text style={{ width: '15%' }}></Text>
-                            <Text style={{ width: '15%' }}>${existingLineItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}</Text>
-                            <Text style={{ width: '25%' }}></Text>
-                        </Flex>
-                    </Flex>
+                    <Table>
+                        <Table.Header>
+                            <Table.Row>
+                                <Table.HeaderCell width="25%">Product Name</Table.HeaderCell>
+                                <Table.HeaderCell width="10%">Quantity</Table.HeaderCell>
+                                <Table.HeaderCell width="15%">Unit Price</Table.HeaderCell>
+                                <Table.HeaderCell width="15%">Total</Table.HeaderCell>
+                                <Table.HeaderCell width="20%">Dates</Table.HeaderCell>
+                                <Table.HeaderCell width="15%">Actions</Table.HeaderCell>
+                            </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                            {existingLineItems.map((item, index) => (
+                                <Table.Row key={item.id} style={{
+                                    backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff'
+                                }}>
+                                    <Table.Cell>{item.productName}</Table.Cell>
+                                    <Table.Cell>{item.quantity}</Table.Cell>
+                                    <Table.Cell>${item.price.toFixed(2)}</Table.Cell>
+                                    <Table.Cell>${item.amount.toFixed(2)}</Table.Cell>
+                                    <Table.Cell>
+                                        {item.startDate && item.endDate 
+                                            ? `${new Date(item.startDate).toLocaleDateString()} - ${new Date(item.endDate).toLocaleDateString()}`
+                                            : 'N/A'}
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                        <Button 
+                                            variant="primary"
+                                            onClick={() => openItemDetailsModal(item)}
+                                        >
+                                            View Details
+                                        </Button>
+                                    </Table.Cell>
+                                </Table.Row>
+                            ))}
+                        </Table.Body>
+                        <Table.Footer>
+                            <Table.Row style={{ fontWeight: 'bold', backgroundColor: '#f3f4f6' }}>
+                                <Table.Cell>Totals</Table.Cell>
+                                <Table.Cell>{totals.quantity}</Table.Cell>
+                                <Table.Cell></Table.Cell>
+                                <Table.Cell>${totals.amount.toFixed(2)}</Table.Cell>
+                                <Table.Cell></Table.Cell>
+                                <Table.Cell></Table.Cell>
+                            </Table.Row>
+                        </Table.Footer>
+                    </Table>
                 ) : (
                     <Alert variant="info" title="No Line Items">
                         This deal has no line items yet.
@@ -235,9 +287,13 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
 export default DealLineItems;
 
 // HubSpot Extension Wrapper
-hubspot.extend(({ context, runServerlessFunction }) => {
+hubspot.extend(({ context, runServerlessFunction, actions }) => {
     try {
-        return <DealLineItems context={context} runServerlessFunction={runServerlessFunction} />;
+        return <DealLineItems 
+            context={context} 
+            runServerlessFunction={runServerlessFunction} 
+            actions={actions} 
+        />;
     } catch (error) {
         console.error('Error initializing extension:', error);
         return (
