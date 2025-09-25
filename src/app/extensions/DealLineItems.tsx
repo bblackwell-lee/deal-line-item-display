@@ -1,4 +1,3 @@
-
 // src/app/extensions/DealLineItems.tsx
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -21,6 +20,14 @@ interface LineItem {
     quantity: number;
     price: number;
     amount: number;
+    product: {
+        id: string;
+        name: string;
+        price: number;
+        description: string;
+        sku: string;
+    } | null;
+    ticketId?: string;
 }
 
 const DealLineItems = ({ context, runServerlessFunction }) => {
@@ -78,6 +85,11 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
             title: 'Line Item Form'
         });
     };
+
+    // Before any render that might use product data
+    if (!lineItems || lineItems.some(item => typeof item === 'undefined')) {
+      return <Alert variant="error">Invalid line item data structure</Alert>;
+    }
 
     // Render loading state
     if (loading) {
