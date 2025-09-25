@@ -205,9 +205,9 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
         const baseUrl = 'https://www.jotform.com/252675934646066';
         const params = new URLSearchParams();
         
-        if (lineItemId) params.append('lineItemId', lineItemId);
-        if (productId) params.append('productId', productId);
-        if (dealId) params.append('dealId', dealId);
+        if (lineItemId) params.append('lineitemid', lineItemId); // Lowercase parameter name
+        if (productId) params.append('productid', productId); // Lowercase parameter name
+        if (dealId) params.append('dealid', dealId); // Lowercase parameter name
         
         const queryString = params.toString();
         return queryString ? `${baseUrl}?${queryString}` : baseUrl;
