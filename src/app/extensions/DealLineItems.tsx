@@ -10,8 +10,8 @@ import {
   TableHeader, 
   TableBody, 
   TableCell, 
-  Spinner, 
-  Alert 
+  Alert,
+  LoadingSpinner
 } from '@hubspot/ui-extensions';
 
 const DealLineItems = ({ context }) => {
@@ -45,8 +45,7 @@ const DealLineItems = ({ context }) => {
   if (loading) {
     return (
       <Flex align="center" justify="center" padding="md">
-        <Spinner size="md" />
-        <Text format={{ fontWeight: 'bold' }}>Loading line items...</Text>
+        <LoadingSpinner label="Loading line items..." size="md" />
       </Flex>
     );
   }
