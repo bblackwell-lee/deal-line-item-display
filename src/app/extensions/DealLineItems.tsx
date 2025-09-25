@@ -7,8 +7,6 @@ import {
     LoadingSpinner,
     Table,
     Text,
-    Modal,
-    ModalBody,
     hubspot
 } from '@hubspot/ui-extensions';
 
@@ -32,15 +30,21 @@ interface LineItem {
 
 const DealLineItems = ({ context, runServerlessFunction }) => {
     // Context
-    const dealId = context.crm.objectId;
-
+    const dealId = context?.crm?.objectId;
+    
     // State
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [lineItems, setLineItems] = useState<LineItem[]>([]);
-
-    // Function to load line items - memoized to prevent recreation on each render
+    
+    // Function to load line items
     const loadLineItems = useCallback(async () => {
+        if (!dealId) {
+            setError('Missing deal ID');
+            setLoading(false);
+            return;
+        }
+        
         setLoading(true);
         setError('');
 
@@ -51,45 +55,40 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
             });
 
             let actualResponse = response;
-            if (response.status === "SUCCESS" && response.response) {
+            if (response?.status === "SUCCESS" && response?.response) {
                 actualResponse = response.response;
             }
 
-            if (actualResponse.success) {
-                setLineItems(actualResponse.data || []);
+            if (actualResponse?.success) {
+                setLineItems(Array.isArray(actualResponse.data) ? actualResponse.data : []);
             } else {
-                setError(actualResponse.message || 'Failed to load line items');
+                setError(actualResponse?.message || 'Failed to load line items');
             }
         } catch (err) {
-            setError('Error loading line items: ' + (err.message || 'Unknown error'));
+            setError('Error loading line items: ' + (err?.message || 'Unknown error'));
         } finally {
             setLoading(false);
         }
     }, [runServerlessFunction, dealId]);
 
-    // Load line items on component mount with proper dependencies
+    // Load line items on component mount
     useEffect(() => {
         loadLineItems();
     }, [loadLineItems]);
 
     // Open the iframe using HubSpot's UI Extensions SDK
     const openIframeModal = (lineItem: LineItem) => {
-        // Generate URL with parameters
-        const baseUrl = 'http://www.myform.com';
-        const url = `${baseUrl}?lineItemId=${encodeURIComponent(lineItem.id)}&productId=${encodeURIComponent(lineItem.productId)}`;
+        if (!lineItem?.id) return;
         
-        // Open the iframe in a modal using the proper HubSpot method
+        const baseUrl = 'http://www.myform.com';
+        const url = `${baseUrl}?lineItemId=${encodeURIComponent(lineItem.id)}&productId=${encodeURIComponent(lineItem.productId || '')}`;
+        
         hubspot.ui.openIframe({
             uri: url,
             size: 'LARGE',
             title: 'Line Item Form'
         });
     };
-
-    // Before any render that might use product data
-    if (!lineItems || lineItems.some(item => typeof item === 'undefined')) {
-      return <Alert variant="error">Invalid line item data structure</Alert>;
-    }
 
     // Render loading state
     if (loading) {
@@ -104,6 +103,11 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
     // Render error state
     if (error) {
         return <Alert variant="error" title="Error">{error}</Alert>;
+    }
+
+    // Validate line items before rendering
+    if (!Array.isArray(lineItems)) {
+        return <Alert variant="error" title="Data Error">Invalid line items data structure</Alert>;
     }
 
     // Render empty state
@@ -129,12 +133,12 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
                 </Table.Head>
                 <Table.Body>
                     {lineItems.map((item) => (
-                        <Table.Row key={item.id}>
-                            <Table.Cell>{item.productName}</Table.Cell>
-                            <Table.Cell>{item.productId}</Table.Cell>
-                            <Table.Cell>{item.quantity}</Table.Cell>
-                            <Table.Cell>${item.price.toFixed(2)}</Table.Cell>
-                            <Table.Cell>${item.amount.toFixed(2)}</Table.Cell>
+                        <Table.Row key={item?.id || Math.random().toString()}>
+                            <Table.Cell>{item?.productName || 'N/A'}</Table.Cell>
+                            <Table.Cell>{item?.productId || 'N/A'}</Table.Cell>
+                            <Table.Cell>{item?.quantity || 0}</Table.Cell>
+                            <Table.Cell>${(item?.price || 0).toFixed(2)}</Table.Cell>
+                            <Table.Cell>${(item?.amount || 0).toFixed(2)}</Table.Cell>
                             <Table.Cell>
                                 <Button
                                     variant="primary"
@@ -152,8 +156,13 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
     );
 };
 
-// HubSpot Extension Wrapper
+// HubSpot Extension Wrapper with defensive coding
 export default hubspot.extend(({ context, runServerlessFunction }) => {
+    if (!context || !runServerlessFunction) {
+        console.error('Missing required props in extension');
+        return <Alert variant="error">Extension initialization error</Alert>;
+    }
+    
     try {
         return <DealLineItems context={context} runServerlessFunction={runServerlessFunction} />;
     } catch (error) {
