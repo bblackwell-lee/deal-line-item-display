@@ -154,7 +154,8 @@ exports.main = async (context = {}, parameters = {}) => {
                     'hs_sku',
                     'description',
                     'hs_line_item_currency_code',
-                    'ticket_id'
+                    'ticket_id',
+                    'ready_for_fulfillment'  // Add this new property
                 ]
             });
 
@@ -235,7 +236,8 @@ exports.main = async (context = {}, parameters = {}) => {
                         description: String(product.description || ''),
                         sku: String(product.sku || '')
                     } : null,
-                    ticketId: String(item?.properties?.ticket_id || '')
+                    ticketId: String(item?.properties?.ticket_id || ''),
+                    readyForFulfillment: String(item?.properties?.ready_for_fulfillment || '') // Add this line
                 };
             } catch (itemError) {
                 console.error(`Error formatting line item at index ${index}:`, itemError, item);
