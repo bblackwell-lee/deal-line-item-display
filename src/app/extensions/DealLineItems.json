@@ -1,0 +1,14 @@
+{
+  "type": "crm-card",
+  "data": {
+    "title": "Deal Line Items Editor",
+    "uid": "deal_line_editor",
+    "location": "crm.record.tab",
+    "module": {
+      "file": "DealLineItems.tsx"
+    },
+    "objectTypes": [
+      { "name": "deal" }
+    ]
+  }
+}

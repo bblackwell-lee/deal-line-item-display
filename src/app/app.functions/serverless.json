@@ -1,0 +1,20 @@
+{
+  "appFunctions": {
+    
+    "get-deal-info": {
+      "file": "get-deal-info.js",
+      "secrets": []
+    },
+    "get-deal-line-items": {
+      "file": "get-deal-line-items.js",
+      "secrets": []
+    }
+   
+  }
+}
+
+
+
+
+
+

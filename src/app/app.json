@@ -1,0 +1,28 @@
+{
+  "name": "Deal Line Item App",
+  "description": "Loads Deal Line Items",
+  "uid": "property_refresh",
+  "scopes": [
+   
+    "crm.objects.deals.read", 
+    "crm.objects.deals.write",
+    "crm.schemas.deals.read",
+    "crm.schemas.deals.write"
+  ],
+  "public": false,
+  "extensions": {
+    "crm": {
+      "cards": [
+        {
+          "file": "extensions/DealLineItems.json"
+        }
+      ]
+    }
+  }
+
+}
+
+
+
+
+
