@@ -182,6 +182,7 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                 if (isMountedRef.current) {
                     setExistingLineItems(Array.isArray(lineItems) ? lineItems : []);
                 }
+                console.log('Loaded line items:', lineItems);
             } else {
                 if (isMountedRef.current) {
                     setError(actualResponse?.message || 'Failed to load line items');
@@ -291,6 +292,12 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
         return value.toLocaleString();
     };
 
+    // Format ID for display (truncate if too long)
+    const formatId = (id) => {
+        if (!id) return 'N/A';
+        return id.length > 10 ? `${id.substring(0, 7)}...` : id;
+    };
+
     // Render loading state
     if (dealLoading && !dealInfo) {
         return (
@@ -353,6 +360,8 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                     <Table bordered={true}>
                         <TableHead>
                             <TableRow>
+                                <TableHeader width="min">Line Item ID</TableHeader>
+                                <TableHeader width="min">Product ID</TableHeader>
                                 <TableHeader width="auto">Product Name</TableHeader>
                                 <TableHeader width="min">Quantity</TableHeader>
                                 <TableHeader width="min">Unit Price</TableHeader>
@@ -368,6 +377,8 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                     <TableRow key={item.id} style={{
                                         backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff'
                                     }}>
+                                        <TableCell>{formatId(item.id)}</TableCell>
+                                        <TableCell>{formatId(item.productId)}</TableCell>
                                         <TableCell>{item.productName || 'Unknown Product'}</TableCell>
                                         <TableCell>{item.quantity || 0}</TableCell>
                                         <TableCell>{formatCurrency(item.price)}</TableCell>
@@ -383,6 +394,8 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                         </TableBody>
                         <TableFooter>
                             <TableRow style={{ fontWeight: 'bold', backgroundColor: '#f3f4f6' }}>
+                                <TableCell></TableCell>
+                                <TableCell></TableCell>
                                 <TableCell>Totals</TableCell>
                                 <TableCell>{totals.quantity}</TableCell>
                                 <TableCell></TableCell>
