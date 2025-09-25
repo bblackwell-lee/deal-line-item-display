@@ -14,7 +14,7 @@ import {
   LoadingSpinner
 } from '@hubspot/ui-extensions';
 
-const DealLineItems = ({ context }) => {
+const DealLineItems = ({ context, runServerless }) => {
   const [lineItems, setLineItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,10 +22,8 @@ const DealLineItems = ({ context }) => {
   useEffect(() => {
     const fetchLineItems = async () => {
       try {
-        // Get the current deal ID from context, safely access nested properties
-        const dealId = context?.parameters?.hs_object_id || 
-                      context?.target?.objectId || 
-                      '';
+        // Get the current deal ID from context using the proper path
+        const dealId = context?.crm?.objectId;
         
         if (!dealId) {
           setError('No deal ID found. Cannot retrieve line items.');
@@ -34,11 +32,12 @@ const DealLineItems = ({ context }) => {
         }
         
         // Call the serverless function to get deal line items
-        const response = await hubspot.serverless('get-deal-line-items', {
+        const response = await runServerless('get-deal-line-items', {
           dealId
         });
         
-        setLineItems(response.lineItems || []);
+        // The serverless function returns data array, not lineItems
+        setLineItems(response.data || []);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching deal line items:', err);
@@ -48,7 +47,7 @@ const DealLineItems = ({ context }) => {
     };
 
     fetchLineItems();
-  }, [context]);
+  }, [context, runServerless]);
 
   if (loading) {
     return (
@@ -92,7 +91,7 @@ const DealLineItems = ({ context }) => {
         <TableBody>
           {lineItems.map((item) => (
             <TableRow key={item.id}>
-              <TableCell>{item.name}</TableCell>
+              <TableCell>{item.productName}</TableCell>
               <TableCell>{item.quantity}</TableCell>
               <TableCell>${item.price?.toFixed(2)}</TableCell>
               <TableCell>${(item.quantity * item.price).toFixed(2)}</TableCell>
@@ -105,6 +104,5 @@ const DealLineItems = ({ context }) => {
 };
 
 export default hubspot.extend(({ runServerless, context }) => {
-  // Ensure we pass runServerless function to the component
-  return <DealLineItems context={context} />;
+  return <DealLineItems context={context} runServerless={runServerless} />;
 });
