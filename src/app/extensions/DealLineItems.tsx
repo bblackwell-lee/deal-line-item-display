@@ -1,4 +1,4 @@
-﻿// src/app/extensions/DealLineItems.tsx
+// src/app/extensions/DealLineItems.tsx
 import { useState, useEffect, useRef } from 'react';
 import {
     Alert,
@@ -38,6 +38,7 @@ interface LineItem {
     startDate?: string;
     endDate?: string;
     ticketId?: string;
+    readyForFulfillment?: string;
 }
 
 interface DealInfo {
@@ -388,23 +389,33 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                         <TableCell>{formatCurrency(item.price)}</TableCell>
                                         <TableCell>{formatCurrency(item.amount)}</TableCell>
                                         <TableCell>
-                                            <Flex direction="row" gap="small">
-                                                <Button
-                                                    variant="primary"
-                                                    size="sm"
-                                                    href={getFormUrl(item.id, item.productId)}
-                                                >
-                                                    Open
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    onClick={() => openItemDetailsModal(item)}
-                                                    disabled={!actions || typeof actions.openIframeModal !== 'function'}
-                                                >
-                                                    Modal
-                                                </Button>
-                                            </Flex>
+                                            {item.ticketId ? (
+                                                <Text format={{ fontStyle: 'italic' }}>
+                                                    Linked to ticket: {formatId(item.ticketId)}
+                                                </Text>
+                                            ) : item.readyForFulfillment === 'yes' ? (
+                                                <Text format={{ fontWeight: 'bold', color: '#166534' }}>
+                                                    Ready For Fulfillment
+                                                </Text>
+                                            ) : (
+                                                <Flex direction="row" gap="small">
+                                                    <Button
+                                                        variant="primary"
+                                                        size="sm"
+                                                        href={getFormUrl(item.id, item.productId)}
+                                                    >
+                                                        Open
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        onClick={() => openItemDetailsModal(item)}
+                                                        disabled={!actions || typeof actions.openIframeModal !== 'function'}
+                                                    >
+                                                        Modal
+                                                    </Button>
+                                                </Flex>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 );
