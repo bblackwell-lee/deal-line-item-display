@@ -202,7 +202,7 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
 
     // Generate form URL with parameters
     const getFormUrl = (lineItemId, productId) => {
-        const baseUrl = 'http://www.form.com';
+        const baseUrl = 'https://www.form.com';
         const params = new URLSearchParams();
         
         if (lineItemId) params.append('lineItemId', lineItemId);
