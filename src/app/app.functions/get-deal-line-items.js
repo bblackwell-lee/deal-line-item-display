@@ -97,7 +97,6 @@ exports.main = async (context = {}, parameters = {}) => {
         'hs_sku',
         'description',
         'hs_line_item_currency_code',
-        'product_type',
         'ticket_id'
    
       ]
