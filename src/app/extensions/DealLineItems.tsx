@@ -347,12 +347,11 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                     <Table>
                         <Table.Header>
                             <Table.Row>
-                                <Table.HeaderCell width="25%">Product Name</Table.HeaderCell>
-                                <Table.HeaderCell width="10%">Quantity</Table.HeaderCell>
+                                <Table.HeaderCell width="30%">Product Name</Table.HeaderCell>
+                                <Table.HeaderCell width="15%">Quantity</Table.HeaderCell>
                                 <Table.HeaderCell width="15%">Unit Price</Table.HeaderCell>
                                 <Table.HeaderCell width="15%">Total</Table.HeaderCell>
-                                <Table.HeaderCell width="20%">Dates</Table.HeaderCell>
-                                <Table.HeaderCell width="15%">Actions</Table.HeaderCell>
+                                <Table.HeaderCell width="25%">Dates</Table.HeaderCell>
                             </Table.Row>
                         </Table.Header>
                         <Table.Body>
@@ -372,15 +371,6 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                                 `${new Date(item.startDate).toLocaleDateString()} - ${new Date(item.endDate).toLocaleDateString()}`
                                             ) : 'N/A'}
                                         </Table.Cell>
-                                        <Table.Cell>
-                                            <Button
-                                                variant="primary"
-                                                onClick={() => openItemDetailsModal(item)}
-                                                disabled={dealInfo?.isClosed}
-                                            >
-                                                View Details
-                                            </Button>
-                                        </Table.Cell>
                                     </Table.Row>
                                 );
                             })}
@@ -391,8 +381,7 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                                 <Table.Cell>{totals.quantity}</Table.Cell>
                                 <Table.Cell></Table.Cell>
                                 <Table.Cell>{formatCurrency(totals.amount)}</Table.Cell>
-                                <Table.Cell></Table.Cell>
-                                <Table.Cell></Table.Cell>
+                                <Table.Cell></TableCell>
                             </Table.Row>
                         </Table.Footer>
                     </Table>
