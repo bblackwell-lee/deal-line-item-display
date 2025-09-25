@@ -1,160 +1,249 @@
-// src/app/extensions/DealLineItems.tsx
-import React, { useEffect, useState } from 'react';
-import { 
-  Text, 
-  Flex, 
-  hubspot, 
-  Table, 
-  TableHead, 
-  TableRow, 
-  TableHeader, 
-  TableBody, 
-  TableCell, 
-  Alert,
-  LoadingSpinner,
-  Button
+﻿// src/app/extensions/DealLineItems.tsx
+import { useState, useEffect, useRef } from 'react';
+import {
+    Alert,
+    Flex,
+    LoadingSpinner,
+    Text,
+    Tile,
+    Image,
+    hubspot
 } from '@hubspot/ui-extensions';
 
-const DealLineItems = ({ context, runServerless }) => {
-  const [lineItems, setLineItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [debugInfo, setDebugInfo] = useState(null);
+// Type definitions
+interface Product {
+    id: string;
+    name: string;
+    description?: string;
+    price: number;
+    sku?: string;
+}
 
-  const fetchLineItems = async () => {
-    try {
-      setLoading(true);
-      // Get the current deal ID from context using the proper path
-      const dealId = context?.crm?.objectId;
-      
-      if (!dealId) {
-        setError('No deal ID found. Cannot retrieve line items.');
-        setLoading(false);
-        return;
-      }
-      
-      console.log(`Fetching line items for deal: ${dealId}`);
-      
-      // Call the serverless function to get deal line items - UPDATED to match DealProductConfiguration pattern
-      const response = await runServerless({
-        name: 'get-deal-line-items', 
-        parameters: { dealId }
-      });
-      
-      // Store debug information - also update how we handle response
-      setDebugInfo(response);
-      
-      // Safety check for response structure
-      if (!response) {
-        setError('Empty response received from server');
-        setLoading(false);
-        return;
-      }
-      
-      // Extract data safely with the correct response pattern
-      let actualResponse = response;
-      if (response.status === "SUCCESS" && response.response) {
-        actualResponse = response.response;
-      }
+interface LineItem {
+    id: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    amount: number;
+    product?: Product;
+    startDate?: string;
+    endDate?: string;
+    ticketId?: string;
+}
 
-      // Access data from the correct response structure
-      const responseData = actualResponse.data || [];
-      const items = Array.isArray(responseData) ? responseData : [];
-      
-      console.log(`Retrieved ${items.length} line items`);
-      
-      // Process items to ensure all required fields exist with proper types
-      const processedItems = items.map(item => ({
-        id: String(item?.id || Math.random()),
-        productName: String(item?.productName || 'Unknown Product'),
-        quantity: Number(item?.quantity || 0),
-        price: Number(item?.price || 0),
-      }));
-      
-      setLineItems(processedItems);
-    } catch (err) {
-      console.error('Error fetching deal line items:', err);
-      setError(`Failed to load deal line items: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+interface DealInfo {
+    id: string;
+    name: string;
+    amount: number;
+    stage: string;
+    stageLabel: string;
+    companyName: string;
+    isClosed: boolean;
+}
 
-  useEffect(() => {
-    fetchLineItems();
-  }, [context, runServerless]);
+const DealLineItems = ({ context, runServerlessFunction }) => {
+    // Context
+    const dealId = context.crm.objectId;
 
-  if (loading) {
-    return (
-      <Flex align="center" justify="center" padding="md">
-        <LoadingSpinner label="Loading line items..." size="md" />
-      </Flex>
-    );
-  }
+    // Add ref to track loading states and prevent duplicate calls
+    const isInitialLoadRef = useRef(true);
+    
+    // Loading states
+    const [dealLoading, setDealLoading] = useState(false);
+    const [lineItemsLoading, setLineItemsLoading] = useState(false);
 
-  if (error) {
-    return (
-      <Flex direction="column" gap="md">
-        <Alert title="Error" variant="error">
-          {error}
+    // Message states
+    const [error, setError] = useState('');
+
+    // Data states
+    const [dealInfo, setDealInfo] = useState<DealInfo | null>(null);
+    const [existingLineItems, setExistingLineItems] = useState<LineItem[]>([]);
+
+    // Load initial data - only run once on mount
+    useEffect(() => {
+        if (isInitialLoadRef.current) {
+            isInitialLoadRef.current = false;
+            loadDealInfo();
+            loadLineItems();
+        }
+    }, []);
+
+    // Load deal info
+    const loadDealInfo = async () => {
+        setDealLoading(true);
+        setError('');
+
+        try {
+            const response = await runServerlessFunction({
+                name: 'get-deal-info',
+                parameters: { dealId }
+            });
+
+            let actualResponse = response;
+            if (response.status === "SUCCESS" && response.response) {
+                actualResponse = response.response;
+            }
+
+            if (actualResponse.success) {
+                const deal = actualResponse.data;
+                setDealInfo({
+                    ...deal,
+                    isClosed: deal.stage === 'closedwon' || deal.stage === 'closedlost' ||
+                        deal.stage === '1030569063' // Custom closed won stage
+                });
+            } else {
+                setError(actualResponse.message || 'Failed to load deal information');
+            }
+        } catch (err) {
+            setError('Error loading deal: ' + err.message);
+        } finally {
+            setDealLoading(false);
+        }
+    };
+
+    // Load line items
+    const loadLineItems = async () => {
+        setLineItemsLoading(true);
+
+        try {
+            const response = await runServerlessFunction({
+                name: 'get-deal-line-items',
+                parameters: { dealId }
+            });
+
+            let actualResponse = response;
+            if (response.status === "SUCCESS" && response.response) {
+                actualResponse = response.response;
+            }
+
+            if (actualResponse.success) {
+                setExistingLineItems(actualResponse.data || []);
+            } else {
+                setError(actualResponse.message || 'Failed to load line items');
+            }
+        } catch (err) {
+            setError('Error loading line items: ' + err.message);
+        } finally {
+            setLineItemsLoading(false);
+        }
+    };
+
+    // Render
+    return dealLoading ? (
+        <Flex direction="column" align="center" justify="center" gap="small">
+            <LoadingSpinner />
+            <Text>Loading deal information...</Text>
+        </Flex>
+    ) : dealInfo ? (
+        <Flex direction="column" gap="medium">
+            <Image
+                src="https://6728858.fs1.hubspotusercontent-na1.net/hubfs/6728858/Express_IO_Logo.png"
+                alt="Sales Order Express"
+            />
+
+            {/* Deal Info Header */}
+            <Tile>
+                <Flex direction="column" gap="small">
+                    <Text format={{ fontWeight: 'bold' }}>Deal: {dealInfo.name}</Text>
+                    <Flex direction="row" gap="medium">
+                        <Text>Stage: {dealInfo.stageLabel}</Text>
+                        <Text>Amount: ${dealInfo.amount.toLocaleString()}</Text>
+                        <Text>Company: {dealInfo.companyName}</Text>
+                        {dealInfo.isClosed && (
+                            <Text format={{ fontWeight: 'bold' }} style={{ color: '#dc2626' }}>
+                                (CLOSED - Read Only)
+                            </Text>
+                        )}
+                    </Flex>
+                </Flex>
+            </Tile>
+
+            {/* Messages */}
+            {error && <Alert variant="error" title="Error">{error}</Alert>}
+
+            {/* Line Items Table */}
+            <Flex direction="column" gap="medium">
+                {lineItemsLoading ? (
+                    <Flex justify="center" align="center" gap="small">
+                        <LoadingSpinner />
+                        <Text>Loading line items...</Text>
+                    </Flex>
+                ) : existingLineItems.length > 0 ? (
+                    <Flex direction="column" gap="small">
+                        {/* Table header */}
+                        <Flex direction="row" gap="small" style={{ 
+                            padding: '8px', 
+                            borderBottom: '1px solid #e5e7eb',
+                            fontWeight: 'bold'
+                        }}>
+                            <Text style={{ width: '30%' }}>Product Name</Text>
+                            <Text style={{ width: '15%' }}>Quantity</Text>
+                            <Text style={{ width: '15%' }}>Unit Price</Text>
+                            <Text style={{ width: '15%' }}>Total</Text>
+                            <Text style={{ width: '25%' }}>Dates</Text>
+                        </Flex>
+                        
+                        {/* Table rows */}
+                        {existingLineItems.map((item, index) => (
+                            <Flex key={item.id} direction="row" gap="small" align="center" style={{ 
+                                padding: '8px', 
+                                borderBottom: '1px solid #e5e7eb',
+                                backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff'
+                            }}>
+                                <Text style={{ width: '30%' }}>{item.productName}</Text>
+                                <Text style={{ width: '15%' }}>{item.quantity}</Text>
+                                <Text style={{ width: '15%' }}>${item.price.toFixed(2)}</Text>
+                                <Text style={{ width: '15%' }}>${item.amount.toFixed(2)}</Text>
+                                <Text style={{ width: '25%' }}>
+                                    {item.startDate && item.endDate 
+                                        ? `${new Date(item.startDate).toLocaleDateString()} - ${new Date(item.endDate).toLocaleDateString()}`
+                                        : 'N/A'}
+                                </Text>
+                            </Flex>
+                        ))}
+                        
+                        {/* Total row */}
+                        <Flex direction="row" gap="small" align="center" style={{ 
+                            padding: '8px', 
+                            borderBottom: '1px solid #e5e7eb',
+                            fontWeight: 'bold',
+                            backgroundColor: '#f3f4f6'
+                        }}>
+                            <Text style={{ width: '30%' }}>Total</Text>
+                            <Text style={{ width: '15%' }}>{existingLineItems.reduce((sum, item) => sum + item.quantity, 0)}</Text>
+                            <Text style={{ width: '15%' }}></Text>
+                            <Text style={{ width: '15%' }}>${existingLineItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}</Text>
+                            <Text style={{ width: '25%' }}></Text>
+                        </Flex>
+                    </Flex>
+                ) : (
+                    <Alert variant="info" title="No Line Items">
+                        This deal has no line items yet.
+                    </Alert>
+                )}
+            </Flex>
+        </Flex>
+    ) : (
+        <Alert variant="error" title="Error">
+            Unable to load deal information
         </Alert>
-        {debugInfo && (
-          <Flex direction="column" gap="xs">
-            <Text format={{ fontWeight: 'bold' }}>Debug Information:</Text>
-            <Text>{JSON.stringify(debugInfo, null, 2)}</Text>
-          </Flex>
-        )}
-        <Button onClick={fetchLineItems}>Retry</Button>
-      </Flex>
     );
-  }
-
-  if (lineItems.length === 0) {
-    return (
-      <Flex align="center" justify="center" padding="md" direction="column" gap="md">
-        <Text>No line items found for this deal</Text>
-        <Button onClick={fetchLineItems}>Refresh</Button>
-      </Flex>
-    );
-  }
-
-  return (
-    <Flex direction="column" gap="md">
-      <Flex justify="space-between" align="center">
-        <Text format={{ fontSize: 'large', fontWeight: 'bold' }}>
-          Deal Line Items ({lineItems.length})
-        </Text>
-        <Button variant="secondary" onClick={fetchLineItems}>Refresh</Button>
-      </Flex>
-      
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableHeader>Name</TableHeader>
-            <TableHeader>Quantity</TableHeader>
-            <TableHeader>Price</TableHeader>
-            <TableHeader>Total</TableHeader>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {lineItems.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell>{item.productName}</TableCell>
-              <TableCell>{item.quantity}</TableCell>
-              <TableCell>${item.price.toFixed(2)}</TableCell>
-              <TableCell>${(item.quantity * item.price).toFixed(2)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      
-      <Text format={{ fontSize: 'small', color: 'gray' }}>
-        Last updated: {new Date().toLocaleString()}
-      </Text>
-    </Flex>
-  );
 };
 
-export default hubspot.extend(({ runServerless, context }) => {
-  return <DealLineItems context={context} runServerless={runServerless} />;
+// Export the component for use in the extension
+export default DealLineItems;
+
+// HubSpot Extension Wrapper
+hubspot.extend(({ context, runServerlessFunction }) => {
+    try {
+        return <DealLineItems context={context} runServerlessFunction={runServerlessFunction} />;
+    } catch (error) {
+        console.error('Error initializing extension:', error);
+        return (
+            <Alert variant="error" title="Extension Error">
+                There was an error initializing the extension. Please refresh the page or contact support.
+            </Alert>
+        );
+    }
 });
