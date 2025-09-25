@@ -17,7 +17,7 @@ exports.main = async (context = {}, parameters = {}) => {
 
     if (!dealId) {
         console.error('No dealId provided in parameters or context');
-        return {
+        const response = {
             success: false,
             message: 'Deal ID is required',
             data: [], // Always include empty data array to prevent rendering errors
@@ -26,16 +26,20 @@ exports.main = async (context = {}, parameters = {}) => {
                 parameters: parameters
             }
         };
+        console.log('=== RETURNING ===', JSON.stringify(response, null, 2));
+        return response;
     }
 
     const token = process.env['PRIVATE_APP_ACCESS_TOKEN'];
     if (!token) {
         console.error('Missing PRIVATE_APP_ACCESS_TOKEN environment variable');
-        return {
+        const response = {
             success: false,
             message: 'Server configuration error: missing access token',
             data: [] // Always include empty data array
         };
+        console.log('=== RETURNING ===', JSON.stringify(response, null, 2));
+        return response;
     }
 
     const hubspotClient = new hubspot.Client({ accessToken: token });
@@ -61,7 +65,7 @@ exports.main = async (context = {}, parameters = {}) => {
             });
         } catch (dealError) {
             console.error('Error fetching deal:', dealError);
-            return {
+            const response = {
                 success: false,
                 message: `Failed to fetch deal ${dealId}: ${dealError.message}`,
                 data: [], // Always include empty data array
@@ -75,6 +79,8 @@ exports.main = async (context = {}, parameters = {}) => {
                     } : null
                 }
             };
+            console.log('=== RETURNING ===', JSON.stringify(response, null, 2));
+            return response;
         }
 
         // Second approach: Use associations API directly
@@ -123,11 +129,13 @@ exports.main = async (context = {}, parameters = {}) => {
 
         if (lineItemIds.length === 0) {
             console.log('No line items found for deal:', dealId);
-            return {
+            const response = {
                 success: true,
                 data: [],
                 message: 'No line items found for this deal'
             };
+            console.log('=== RETURNING ===', JSON.stringify(response, null, 2));
+            return response;
         }
 
         console.log(`Found ${lineItemIds.length} unique line items for deal:`, lineItemIds);
@@ -153,7 +161,7 @@ exports.main = async (context = {}, parameters = {}) => {
             console.log(`Retrieved ${lineItemsResponse.results?.length || 0} line items from batch API`);
         } catch (batchError) {
             console.error('Error fetching line items batch:', batchError);
-            return {
+            const response = {
                 success: false,
                 message: `Failed to fetch line items: ${batchError.message}`,
                 data: [], // Always include empty data array
@@ -163,6 +171,8 @@ exports.main = async (context = {}, parameters = {}) => {
                     lineItemIds: lineItemIds
                 }
             };
+            console.log('=== RETURNING ===', JSON.stringify(response, null, 2));
+            return response;
         }
 
         // Ensure results is an array
@@ -248,7 +258,7 @@ exports.main = async (context = {}, parameters = {}) => {
         // Always return an array, even if empty
         const safeLineItems = Array.isArray(lineItems) ? lineItems : [];
 
-        return {
+        const response = {
             success: true,
             data: safeLineItems,
             meta: {
@@ -257,10 +267,12 @@ exports.main = async (context = {}, parameters = {}) => {
                 productsFound: Object.keys(productsMap).length
             }
         };
+        console.log('=== RETURNING ===', JSON.stringify(response, null, 2));
+        return response;
 
     } catch (error) {
         console.error('Unexpected error in get-deal-line-items:', error);
-        return {
+        const response = {
             success: false,
             message: error.message || 'Failed to fetch line items',
             data: [], // Always include empty data array
@@ -275,5 +287,7 @@ exports.main = async (context = {}, parameters = {}) => {
                 } : null
             }
         };
+        console.log('=== RETURNING ===', JSON.stringify(response, null, 2));
+        return response;
     }
 };
