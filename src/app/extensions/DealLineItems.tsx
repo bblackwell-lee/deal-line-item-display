@@ -1,5 +1,6 @@
+
 // src/app/extensions/DealLineItems.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     Alert,
     Button,
@@ -31,13 +32,8 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
     const [error, setError] = useState('');
     const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
-    // Load line items on component mount
-    useEffect(() => {
-        loadLineItems();
-    }, []);
-
-    // Function to load line items
-    const loadLineItems = async () => {
+    // Function to load line items - memoized to prevent recreation on each render
+    const loadLineItems = useCallback(async () => {
         setLoading(true);
         setError('');
 
@@ -58,11 +54,16 @@ const DealLineItems = ({ context, runServerlessFunction }) => {
                 setError(actualResponse.message || 'Failed to load line items');
             }
         } catch (err) {
-            setError('Error loading line items: ' + err.message);
+            setError('Error loading line items: ' + (err.message || 'Unknown error'));
         } finally {
             setLoading(false);
         }
-    };
+    }, [runServerlessFunction, dealId]);
+
+    // Load line items on component mount with proper dependencies
+    useEffect(() => {
+        loadLineItems();
+    }, [loadLineItems]);
 
     // Open the iframe using HubSpot's UI Extensions SDK
     const openIframeModal = (lineItem: LineItem) => {
