@@ -36,8 +36,22 @@ const DealLineItems = ({ context, runServerless }) => {
           dealId
         });
         
-        // The serverless function returns data array, not lineItems
-        setLineItems(response.data || []);
+        if (!response || !Array.isArray(response.data)) {
+          console.error('Unexpected response format:', response);
+          setError('Invalid data format received from server');
+          setLoading(false);
+          return;
+        }
+        
+        // Process items to ensure all required fields exist with proper types
+        const processedItems = response.data.map(item => ({
+          id: item?.id || Math.random().toString(),
+          productName: item?.productName || 'Unknown Product',
+          quantity: Number(item?.quantity || 0),
+          price: Number(item?.price || 0),
+        }));
+        
+        setLineItems(processedItems);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching deal line items:', err);
@@ -93,8 +107,10 @@ const DealLineItems = ({ context, runServerless }) => {
             <TableRow key={item.id}>
               <TableCell>{item.productName}</TableCell>
               <TableCell>{item.quantity}</TableCell>
-              <TableCell>${item.price?.toFixed(2)}</TableCell>
-              <TableCell>${(item.quantity * item.price).toFixed(2)}</TableCell>
+              <TableCell>${typeof item.price === 'number' ? item.price.toFixed(2) : '0.00'}</TableCell>
+              <TableCell>${typeof item.quantity === 'number' && typeof item.price === 'number' 
+                ? (item.quantity * item.price).toFixed(2) 
+                : '0.00'}</TableCell>
             </TableRow>
           ))}
         </TableBody>
