@@ -20,6 +20,7 @@ exports.main = async (context = {}, parameters = {}) => {
         return {
             success: false,
             message: 'Deal ID is required',
+            data: [], // Always include empty data array to prevent rendering errors
             debug: {
                 context: context,
                 parameters: parameters
@@ -32,7 +33,8 @@ exports.main = async (context = {}, parameters = {}) => {
         console.error('Missing PRIVATE_APP_ACCESS_TOKEN environment variable');
         return {
             success: false,
-            message: 'Server configuration error: missing access token'
+            message: 'Server configuration error: missing access token',
+            data: [] // Always include empty data array
         };
     }
 
@@ -62,6 +64,7 @@ exports.main = async (context = {}, parameters = {}) => {
             return {
                 success: false,
                 message: `Failed to fetch deal ${dealId}: ${dealError.message}`,
+                data: [], // Always include empty data array
                 errorDetails: {
                     name: dealError.name,
                     status: dealError.status,
@@ -95,15 +98,19 @@ exports.main = async (context = {}, parameters = {}) => {
         let lineItemIds = [];
 
         // From direct associations API
-        if (associationsResponse.results && associationsResponse.results.length > 0) {
-            const idsFromAssociations = associationsResponse.results.map(result => result.id);
+        if (associationsResponse?.results && associationsResponse.results.length > 0) {
+            const idsFromAssociations = associationsResponse.results
+                .map(result => result?.id)
+                .filter(Boolean);
             console.log(`Found ${idsFromAssociations.length} line items via associations API`);
             lineItemIds = [...lineItemIds, ...idsFromAssociations];
         }
 
         // From deal getById with associations
-        if (dealResponse.associations?.line_items?.results) {
-            const idsFromDeal = dealResponse.associations.line_items.results.map(r => r.id);
+        if (dealResponse?.associations?.line_items?.results) {
+            const idsFromDeal = dealResponse.associations.line_items.results
+                .map(r => r?.id)
+                .filter(Boolean);
             console.log(`Found ${idsFromDeal.length} line items via deal getById`);
             // Add any IDs not already in the array
             idsFromDeal.forEach(id => {
@@ -149,6 +156,7 @@ exports.main = async (context = {}, parameters = {}) => {
             return {
                 success: false,
                 message: `Failed to fetch line items: ${batchError.message}`,
+                data: [], // Always include empty data array
                 errorDetails: {
                     name: batchError.name,
                     status: batchError.status,
@@ -157,9 +165,12 @@ exports.main = async (context = {}, parameters = {}) => {
             };
         }
 
+        // Ensure results is an array
+        const lineItemResults = lineItemsResponse?.results || [];
+
         // Get product details for each line item
-        const productIds = [...new Set(lineItemsResponse.results
-            .map(item => item.properties.hs_product_id)
+        const productIds = [...new Set(lineItemResults
+            .map(item => item?.properties?.hs_product_id)
             .filter(Boolean))];
 
         let productsMap = {};
@@ -171,16 +182,21 @@ exports.main = async (context = {}, parameters = {}) => {
                     properties: ['name', 'price', 'description', 'hs_sku', 'rate_type', 'required_attributes', 'automation_db_list']
                 });
 
-                productsMap = productsResponse.results.reduce((map, product) => {
-                    map[product.id] = {
-                        id: product.id,
-                        name: product.properties.name,
-                        price: parseFloat(product.properties.price) || 0,
-                        description: product.properties.description,
-                        sku: product.properties.hs_sku
-                    };
-                    return map;
-                }, {});
+                // Safely map products
+                if (productsResponse?.results) {
+                    productsMap = productsResponse.results.reduce((map, product) => {
+                        if (product && product.id) {
+                            map[product.id] = {
+                                id: product.id,
+                                name: product.properties?.name || '',
+                                price: parseFloat(product.properties?.price || '0') || 0,
+                                description: product.properties?.description || '',
+                                sku: product.properties?.hs_sku || ''
+                            };
+                        }
+                        return map;
+                    }, {});
+                }
 
                 console.log(`Mapped ${Object.keys(productsMap).length} products`);
             } catch (err) {
@@ -189,31 +205,33 @@ exports.main = async (context = {}, parameters = {}) => {
         }
 
         // Format line items with better error handling
-        const lineItems = lineItemsResponse.results.map((item, index) => {
+        const lineItems = lineItemResults.map((item, index) => {
             try {
-                const product = productsMap[item.properties.hs_product_id] || null;
+                const productId = item?.properties?.hs_product_id || '';
+                const product = productsMap[productId] || null;
 
+                // Create a safe line item object
                 return {
-                    id: String(item.id || ''),
-                    productId: String(item.properties.hs_product_id || ''),
-                    productName: String(item.properties.name || (product?.name || 'Unknown Product')),
-                    quantity: parseInt(item.properties.quantity) || 1,
-                    price: parseFloat(item.properties.price) || 0,
-                    amount: parseFloat(item.properties.amount) || 0,
+                    id: String(item?.id || `item-${index}`),
+                    productId: String(productId || ''),
+                    productName: String(item?.properties?.name || (product?.name || 'Unknown Product')),
+                    quantity: parseInt(item?.properties?.quantity || '1', 10) || 1,
+                    price: parseFloat(item?.properties?.price || '0') || 0,
+                    amount: parseFloat(item?.properties?.amount || '0') || 0,
                     product: product ? {
                         id: String(product.id || ''),
                         name: String(product.name || ''),
-                        price: parseFloat(product.price) || 0,
+                        price: product.price || 0,
                         description: String(product.description || ''),
                         sku: String(product.sku || '')
                     } : null,
-                    ticketId: String(item.properties.ticket_id || '')
+                    ticketId: String(item?.properties?.ticket_id || '')
                 };
             } catch (itemError) {
                 console.error(`Error formatting line item at index ${index}:`, itemError, item);
                 // Return a minimal valid item instead of crashing
                 return {
-                    id: String(item.id || `error-${index}`),
+                    id: String(item?.id || `error-${index}`),
                     productId: '',
                     productName: 'Error loading item',
                     quantity: 0,
@@ -227,21 +245,15 @@ exports.main = async (context = {}, parameters = {}) => {
 
         console.log(`Formatted ${lineItems.length} line items successfully`);
 
-        // Validate the result
-        if (!Array.isArray(lineItems)) {
-            console.error('Line items is not an array:', typeof lineItems, lineItems);
-            return {
-                success: false,
-                message: 'Internal error: failed to format line items as array'
-            };
-        }
+        // Always return an array, even if empty
+        const safeLineItems = Array.isArray(lineItems) ? lineItems : [];
 
         return {
             success: true,
-            data: lineItems,
+            data: safeLineItems,
             meta: {
                 totalFound: lineItemIds.length,
-                totalFormatted: lineItems.length,
+                totalFormatted: safeLineItems.length,
                 productsFound: Object.keys(productsMap).length
             }
         };
@@ -251,6 +263,7 @@ exports.main = async (context = {}, parameters = {}) => {
         return {
             success: false,
             message: error.message || 'Failed to fetch line items',
+            data: [], // Always include empty data array
             errorDetails: {
                 name: error.name,
                 status: error.status,

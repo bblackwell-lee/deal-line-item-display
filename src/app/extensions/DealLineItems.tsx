@@ -125,6 +125,13 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
 
     // Open the iframe using HubSpot's UI Extensions SDK
     const openIframeModal = useCallback((lineItem: LineItem) => {
+        // Add this null check
+        if (!lineItem) {
+            console.warn('Cannot open modal: line item is null or undefined');
+            setError('Cannot open form: invalid line item data');
+            return;
+        }
+
         if (!lineItem?.id) {
             console.warn('Cannot open modal: missing line item ID');
             setError('Cannot open form: missing line item data');
@@ -224,7 +231,7 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
                     </Table.Row>
                 </Table.Head>
                 <Table.Body>
-                    {lineItems.map((item, index) => {
+                    {(Array.isArray(lineItems) ? lineItems : []).map((item, index) => {
                         // Ensure we have valid data for each item
                         if (!item || typeof item !== 'object') {
                             console.warn('Invalid line item at index', index, item);
