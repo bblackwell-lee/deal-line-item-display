@@ -69,29 +69,44 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
 
             console.log('Raw response:', response);
 
-            // Handle different response formats
+            // Handle different response formats more robustly
             let actualResponse = response;
+
+            // Handle nested response structures
             if (response?.status === "SUCCESS" && response?.response) {
+                actualResponse = response.response;
+            } else if (response?.response && typeof response.response === 'object') {
                 actualResponse = response.response;
             }
 
-            if (actualResponse?.success) {
+            // Check for success in the response
+            if (actualResponse && actualResponse.success === true) {
                 const data = actualResponse.data;
                 if (Array.isArray(data)) {
                     console.log('Setting line items:', data);
-                    setLineItems(data);
+                    // Validate each line item before setting state
+                    const validatedItems = data.filter(item =>
+                        item && typeof item === 'object' && item.id
+                    );
+                    setLineItems(validatedItems);
+                } else if (data === null || data === undefined) {
+                    console.log('No line items returned');
+                    setLineItems([]);
                 } else {
                     console.warn('Invalid data format:', data);
                     setLineItems([]);
                 }
             } else {
-                const errorMsg = actualResponse?.message || 'Failed to load line items';
-                console.error('API error:', errorMsg);
+                const errorMsg = actualResponse?.message || response?.message || 'Failed to load line items';
+                console.error('API error:', errorMsg, 'Full response:', response);
                 setError(errorMsg);
+                setLineItems([]);
             }
         } catch (err: any) {
             console.error('Error loading line items:', err);
-            setError('Error loading line items: ' + (err?.message || 'Unknown error'));
+            const errorMessage = err?.message || err?.toString() || 'Unknown error';
+            setError('Error loading line items: ' + errorMessage);
+            setLineItems([]);
         } finally {
             setLoading(false);
         }
@@ -144,7 +159,7 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
     if (!dealId) {
         return (
             <Alert variant="error" title="Deal ID Error">
-                <Text>No deal ID found in context.</Text>
+                <Text>No deal ID found in context. Context: {JSON.stringify(context)}</Text>
             </Alert>
         );
     }
@@ -228,13 +243,13 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
                                     <Text>{item.productId || 'N/A'}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    <Text>{(item.quantity || 0).toString()}</Text>
+                                    <Text>{String(item.quantity || 0)}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    <Text>${(item.price || 0).toFixed(2)}</Text>
+                                    <Text>${Number(item.price || 0).toFixed(2)}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
-                                    <Text>${(item.amount || 0).toFixed(2)}</Text>
+                                    <Text>${Number(item.amount || 0).toFixed(2)}</Text>
                                 </Table.Cell>
                                 <Table.Cell>
                                     <Button
@@ -254,6 +269,47 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
         </Flex>
     );
 };
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component<
+    { children: React.ReactNode },
+    { hasError: boolean; error?: Error }
+> {
+    constructor(props: { children: React.ReactNode }) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.error('DealLineItems Error Boundary caught an error:', error, errorInfo);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <Alert variant="error" title="Component Error">
+                    <Text>Something went wrong with the line items component.</Text>
+                    <Text format={{ fontStyle: 'italic', fontSize: 'small' }}>
+                        {this.state.error?.message || 'Unknown error occurred'}
+                    </Text>
+                    <Button
+                        onClick={() => this.setState({ hasError: false, error: undefined })}
+                        variant="secondary"
+                        size="small"
+                    >
+                        Reset Component
+                    </Button>
+                </Alert>
+            );
+        }
+
+        return this.props.children;
+    }
+}
 
 // HubSpot Extension Wrapper with comprehensive error handling
 const WrappedDealLineItems = (props: any) => {
@@ -287,22 +343,12 @@ const WrappedDealLineItems = (props: any) => {
         );
     }
 
-    // Wrap the main component in error boundary logic
-    try {
-        return React.createElement(DealLineItems, { context, runServerlessFunction });
-    } catch (error) {
-        console.error('Error rendering DealLineItems component:', error);
-        return (
-            <Alert variant="error" title="Rendering Error">
-                <Text>There was an error rendering the component. Please refresh the page.</Text>
-                {error instanceof Error && (
-                    <Text format={{ fontStyle: 'italic', fontSize: 'small' }}>
-                        Error: {error.message}
-                    </Text>
-                )}
-            </Alert>
-        );
-    }
+    // Wrap the main component in error boundary
+    return (
+        <ErrorBoundary>
+            <DealLineItems context={context} runServerlessFunction={runServerlessFunction} />
+        </ErrorBoundary>
+    );
 };
 
 export default hubspot.extend(WrappedDealLineItems);
