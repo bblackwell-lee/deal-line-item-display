@@ -9,6 +9,12 @@ import {
     Image,
     Button,
     Table,
+    TableHead,
+    TableRow,
+    TableHeader,
+    TableBody,
+    TableCell,
+    TableFooter,
     hubspot
 } from '@hubspot/ui-extensions';
 
@@ -344,46 +350,46 @@ const DealLineItems = ({ context, runServerlessFunction, actions }) => {
                         <Text>Loading line items...</Text>
                     </Flex>
                 ) : existingLineItems && existingLineItems.length > 0 ? (
-                    <Table>
-                        <Table.Header>
-                            <Table.Row>
-                                <Table.HeaderCell width="30%">Product Name</Table.HeaderCell>
-                                <Table.HeaderCell width="15%">Quantity</Table.HeaderCell>
-                                <Table.HeaderCell width="15%">Unit Price</Table.HeaderCell>
-                                <Table.HeaderCell width="15%">Total</Table.HeaderCell>
-                                <Table.HeaderCell width="25%">Dates</Table.HeaderCell>
-                            </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
+                    <Table bordered={true}>
+                        <TableHead>
+                            <TableRow>
+                                <TableHeader width="auto">Product Name</TableHeader>
+                                <TableHeader width="min">Quantity</TableHeader>
+                                <TableHeader width="min">Unit Price</TableHeader>
+                                <TableHeader width="min">Total</TableHeader>
+                                <TableHeader width="auto">Dates</TableHeader>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
                             {existingLineItems.map((item, index) => {
                                 if (!item || !item.id) return null;
 
                                 return (
-                                    <Table.Row key={item.id} style={{
+                                    <TableRow key={item.id} style={{
                                         backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff'
                                     }}>
-                                        <Table.Cell>{item.productName || 'Unknown Product'}</Table.Cell>
-                                        <Table.Cell>{item.quantity || 0}</Table.Cell>
-                                        <Table.Cell>{formatCurrency(item.price)}</Table.Cell>
-                                        <Table.Cell>{formatCurrency(item.amount)}</Table.Cell>
-                                        <Table.Cell>
+                                        <TableCell>{item.productName || 'Unknown Product'}</TableCell>
+                                        <TableCell>{item.quantity || 0}</TableCell>
+                                        <TableCell>{formatCurrency(item.price)}</TableCell>
+                                        <TableCell>{formatCurrency(item.amount)}</TableCell>
+                                        <TableCell>
                                             {item.startDate && item.endDate ? (
                                                 `${new Date(item.startDate).toLocaleDateString()} - ${new Date(item.endDate).toLocaleDateString()}`
                                             ) : 'N/A'}
-                                        </Table.Cell>
-                                    </Table.Row>
+                                        </TableCell>
+                                    </TableRow>
                                 );
                             })}
-                        </Table.Body>
-                        <Table.Footer>
-                            <Table.Row style={{ fontWeight: 'bold', backgroundColor: '#f3f4f6' }}>
-                                <Table.Cell>Totals</Table.Cell>
-                                <Table.Cell>{totals.quantity}</Table.Cell>
-                                <Table.Cell></Table.Cell>
-                                <Table.Cell>{formatCurrency(totals.amount)}</Table.Cell>
-                                <Table.Cell></TableCell>
-                            </Table.Row>
-                        </Table.Footer>
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow style={{ fontWeight: 'bold', backgroundColor: '#f3f4f6' }}>
+                                <TableCell>Totals</TableCell>
+                                <TableCell>{totals.quantity}</TableCell>
+                                <TableCell></TableCell>
+                                <TableCell>{formatCurrency(totals.amount)}</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                        </TableFooter>
                     </Table>
                 ) : (
                     <Alert variant="info" title="No Line Items">
