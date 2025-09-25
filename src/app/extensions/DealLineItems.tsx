@@ -22,8 +22,16 @@ const DealLineItems = ({ context }) => {
   useEffect(() => {
     const fetchLineItems = async () => {
       try {
-        // Get the current deal ID from context
-        const dealId = context.parameters.hs_object_id;
+        // Get the current deal ID from context, safely access nested properties
+        const dealId = context?.parameters?.hs_object_id || 
+                      context?.target?.objectId || 
+                      '';
+        
+        if (!dealId) {
+          setError('No deal ID found. Cannot retrieve line items.');
+          setLoading(false);
+          return;
+        }
         
         // Call the serverless function to get deal line items
         const response = await hubspot.serverless('get-deal-line-items', {
@@ -40,7 +48,7 @@ const DealLineItems = ({ context }) => {
     };
 
     fetchLineItems();
-  }, [context.parameters.hs_object_id]);
+  }, [context]);
 
   if (loading) {
     return (
@@ -96,4 +104,7 @@ const DealLineItems = ({ context }) => {
   );
 };
 
-export default hubspot.extend(({ context }) => <DealLineItems context={context} />);
+export default hubspot.extend(({ runServerless, context }) => {
+  // Ensure we pass runServerless function to the component
+  return <DealLineItems context={context} />;
+});
