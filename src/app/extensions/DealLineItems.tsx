@@ -34,18 +34,24 @@ interface DealLineItemsProps {
 }
 
 const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFunction }) => {
-    // Context
+    // Context - add safety check
     const dealId = context?.crm?.objectId;
 
-    // State
+    // State with proper initialization
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>('');
     const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
-    // Function to load line items
+    // Function to load line items with better error handling
     const loadLineItems = useCallback(async () => {
         if (!dealId) {
             setError('Missing deal ID');
+            setLoading(false);
+            return;
+        }
+
+        if (!runServerlessFunction) {
+            setError('Serverless function not available');
             setLoading(false);
             return;
         }
@@ -54,20 +60,34 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
         setError('');
 
         try {
+            console.log('Loading line items for deal:', dealId);
+
             const response = await runServerlessFunction({
                 name: 'get-deal-line-items',
                 parameters: { dealId }
             });
 
+            console.log('Raw response:', response);
+
+            // Handle different response formats
             let actualResponse = response;
             if (response?.status === "SUCCESS" && response?.response) {
                 actualResponse = response.response;
             }
 
             if (actualResponse?.success) {
-                setLineItems(Array.isArray(actualResponse.data) ? actualResponse.data : []);
+                const data = actualResponse.data;
+                if (Array.isArray(data)) {
+                    console.log('Setting line items:', data);
+                    setLineItems(data);
+                } else {
+                    console.warn('Invalid data format:', data);
+                    setLineItems([]);
+                }
             } else {
-                setError(actualResponse?.message || 'Failed to load line items');
+                const errorMsg = actualResponse?.message || 'Failed to load line items';
+                console.error('API error:', errorMsg);
+                setError(errorMsg);
             }
         } catch (err: any) {
             console.error('Error loading line items:', err);
@@ -79,13 +99,20 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
 
     // Load line items on component mount
     useEffect(() => {
-        loadLineItems();
-    }, [loadLineItems]);
+        if (dealId && runServerlessFunction) {
+            loadLineItems();
+        } else {
+            setLoading(false);
+            if (!dealId) setError('No deal ID available');
+            if (!runServerlessFunction) setError('Serverless function not available');
+        }
+    }, [loadLineItems, dealId, runServerlessFunction]);
 
     // Open the iframe using HubSpot's UI Extensions SDK
     const openIframeModal = useCallback((lineItem: LineItem) => {
         if (!lineItem?.id) {
             console.warn('Cannot open modal: missing line item ID');
+            setError('Cannot open form: missing line item data');
             return;
         }
 
@@ -93,6 +120,7 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
         const url = `${baseUrl}?lineItemId=${encodeURIComponent(lineItem.id)}&productId=${encodeURIComponent(lineItem.productId || '')}`;
 
         try {
+            console.log('Opening iframe with URL:', url);
             hubspot.ui.openIframe({
                 uri: url,
                 size: 'LARGE',
@@ -106,7 +134,19 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
 
     // Early return for missing context
     if (!context) {
-        return <Alert variant="error" title="Context Error">Missing context data</Alert>;
+        return (
+            <Alert variant="error" title="Context Error">
+                <Text>Missing context data. Please refresh the page.</Text>
+            </Alert>
+        );
+    }
+
+    if (!dealId) {
+        return (
+            <Alert variant="error" title="Deal ID Error">
+                <Text>No deal ID found in context.</Text>
+            </Alert>
+        );
     }
 
     // Render loading state
@@ -121,24 +161,27 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
 
     // Render error state
     if (error) {
-        return <Alert variant="error" title="Error">{error}</Alert>;
-    }
-
-    // Validate line items before rendering
-    if (!Array.isArray(lineItems)) {
-        console.error('Invalid line items data:', lineItems);
-        return <Alert variant="error" title="Data Error">Invalid line items data structure</Alert>;
+        return (
+            <Alert variant="error" title="Error">
+                <Text>{error}</Text>
+                <Button onClick={loadLineItems} variant="secondary" size="small">
+                    Try Again
+                </Button>
+            </Alert>
+        );
     }
 
     // Render empty state
-    if (lineItems.length === 0) {
+    if (!Array.isArray(lineItems) || lineItems.length === 0) {
         return (
-            <Alert variant="info" title="No Line Items">
-                This deal has no line items.
+            <Flex direction="column" gap="medium">
+                <Alert variant="info" title="No Line Items">
+                    <Text>This deal has no line items.</Text>
+                </Alert>
                 <Button onClick={loadLineItems} variant="secondary" size="small">
                     Refresh
                 </Button>
-            </Alert>
+            </Flex>
         );
     }
 
@@ -146,7 +189,9 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
     return (
         <Flex direction="column" gap="medium">
             <Flex justify="space-between" align="center">
-                <Text format={{ fontWeight: 'bold' }}>Deal Line Items ({lineItems.length})</Text>
+                <Text format={{ fontWeight: 'bold' }}>
+                    Deal Line Items ({lineItems.length})
+                </Text>
                 <Button onClick={loadLineItems} variant="secondary" size="small">
                     Refresh
                 </Button>
@@ -165,57 +210,96 @@ const DealLineItems: React.FC<DealLineItemsProps> = ({ context, runServerlessFun
                 </Table.Head>
                 <Table.Body>
                     {lineItems.map((item, index) => {
-                        // Generate a stable key
-                        const key = item?.id || `line-item-${index}`;
+                        // Ensure we have valid data for each item
+                        if (!item || typeof item !== 'object') {
+                            console.warn('Invalid line item at index', index, item);
+                            return null;
+                        }
+
+                        // Generate a stable key - prefer ID, fallback to index
+                        const key = item.id || `line-item-${index}`;
 
                         return (
                             <Table.Row key={key}>
-                                <Table.Cell>{item?.productName || 'N/A'}</Table.Cell>
-                                <Table.Cell>{item?.productId || 'N/A'}</Table.Cell>
-                                <Table.Cell>{item?.quantity || 0}</Table.Cell>
-                                <Table.Cell>${(item?.price || 0).toFixed(2)}</Table.Cell>
-                                <Table.Cell>${(item?.amount || 0).toFixed(2)}</Table.Cell>
+                                <Table.Cell>
+                                    <Text>{item.productName || 'N/A'}</Text>
+                                </Table.Cell>
+                                <Table.Cell>
+                                    <Text>{item.productId || 'N/A'}</Text>
+                                </Table.Cell>
+                                <Table.Cell>
+                                    <Text>{(item.quantity || 0).toString()}</Text>
+                                </Table.Cell>
+                                <Table.Cell>
+                                    <Text>${(item.price || 0).toFixed(2)}</Text>
+                                </Table.Cell>
+                                <Table.Cell>
+                                    <Text>${(item.amount || 0).toFixed(2)}</Text>
+                                </Table.Cell>
                                 <Table.Cell>
                                     <Button
                                         variant="primary"
                                         size="small"
                                         onClick={() => openIframeModal(item)}
-                                        disabled={!item?.id}
+                                        disabled={!item.id}
                                     >
                                         Open Form
                                     </Button>
                                 </Table.Cell>
                             </Table.Row>
                         );
-                    })}
+                    }).filter(Boolean)} {/* Remove null items */}
                 </Table.Body>
             </Table>
         </Flex>
     );
 };
 
-// HubSpot Extension Wrapper with better error handling
-const WrappedDealLineItems = ({ context, runServerlessFunction }: any) => {
-    if (!context || !runServerlessFunction) {
-        console.error('Missing required props in extension:', { context: !!context, runServerlessFunction: !!runServerlessFunction });
+// HubSpot Extension Wrapper with comprehensive error handling
+const WrappedDealLineItems = (props: any) => {
+    const { context, runServerlessFunction } = props;
+
+    // Validate props
+    if (!props) {
+        console.error('No props provided to extension');
         return (
             <Alert variant="error" title="Extension Error">
-                Missing required extension props. Please refresh the page.
+                <Text>No props provided. Please refresh the page.</Text>
             </Alert>
         );
     }
 
-    try {
-        return <DealLineItems context={context} runServerlessFunction={runServerlessFunction} />;
-    } catch (error) {
-        console.error('Error initializing extension:', error);
+    if (!context) {
+        console.error('Missing context in extension props');
         return (
-            <Alert variant="error" title="Extension Error">
-                There was an error initializing the extension. Please refresh the page.
-                <br />
-                <Text format={{ fontStyle: 'italic', fontSize: 'small' }}>
-                    Error: {error instanceof Error ? error.message : 'Unknown error'}
-                </Text>
+            <Alert variant="error" title="Context Error">
+                <Text>Missing context data. Please refresh the page.</Text>
+            </Alert>
+        );
+    }
+
+    if (!runServerlessFunction) {
+        console.error('Missing runServerlessFunction in extension props');
+        return (
+            <Alert variant="error" title="Function Error">
+                <Text>Serverless function not available. Please refresh the page.</Text>
+            </Alert>
+        );
+    }
+
+    // Wrap the main component in error boundary logic
+    try {
+        return React.createElement(DealLineItems, { context, runServerlessFunction });
+    } catch (error) {
+        console.error('Error rendering DealLineItems component:', error);
+        return (
+            <Alert variant="error" title="Rendering Error">
+                <Text>There was an error rendering the component. Please refresh the page.</Text>
+                {error instanceof Error && (
+                    <Text format={{ fontStyle: 'italic', fontSize: 'small' }}>
+                        Error: {error.message}
+                    </Text>
+                )}
             </Alert>
         );
     }
